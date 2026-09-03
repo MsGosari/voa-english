@@ -65,47 +65,28 @@
     ];
 
     async function fetchVOANews() {
-      const selectEl = document.getElementById('newsSelect');
-  selectEl.innerHTML = '<option value="">⚡ VOA 최신 뉴스를 불러오는 중...</option>';
-
-  // VOA Learning English RSS URL
-  const rssUrl = 'https://learningenglish.voanews.com/api/z-$m_qvy5-it';
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+  const selectEl = document.getElementById('newsSelect');
+  selectEl.innerHTML = '<option value="">⚡ 최신 뉴스를 가져오는 중...</option>';
 
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
+    // 내 GitHub 저장소에 저장된 news.json 호출 (차단 위험 0%)
+    const response = await fetch('./news.json');
+    if (!response.ok) throw new Error("news.json 파일 없음");
+    
+    newsArticles = await response.json();
 
-    if (data.contents) {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(data.contents, "text/xml");
-      const items = xml.querySelectorAll("item");
-
-      newsArticles = [];
-      selectEl.innerHTML = '<option value="">-- 읽고 싶은 뉴스를 선택하세요 --</option>';
-
-      items.forEach((item, index) => {
-        const title = item.querySelector("title")?.textContent || "제목 없음";
-        // 본문 또는 요약문 추출
-        const content = item.querySelector("description")?.textContent || "";
-
-        if (content.length > 50) { // 내용이 유효한 기사만 저장
-          newsArticles.push({ title, content });
-          
-          const option = document.createElement('option');
-          option.value = newsArticles.length - 1;
-          option.innerText = title;
-          selectEl.appendChild(option);
-        }
-      });
-    } else {
-      throw new Error("데이터 없음");
-    }
+    selectEl.innerHTML = '<option value="">-- 읽고 싶은 뉴스를 선택하세요 --</option>';
+    newsArticles.forEach((item, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.innerText = item.title;
+      selectEl.appendChild(option);
+    });
   } catch (error) {
-    console.error("RSS 가져오기 실패:", error);
-    selectEl.innerHTML = '<option value="">⚠️ 뉴스를 가져오지 못했습니다. 새로고침 해주세요.</option>';
+    console.error(error);
+    selectEl.innerHTML = '<option value="">⚠️ 뉴스를 불러오는 중입니다. 잠시 후 새로고침 해주세요.</option>';
   }
-    }
+}
 
     function loadSelectedNews() {
       const index = document.getElementById('newsSelect').value;

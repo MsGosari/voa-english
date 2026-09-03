@@ -29,7 +29,7 @@
   <div class="news-select-box">
     <h3>📰 오늘의 VOA 최신 기사 선택</h3>
     <select id="newsSelect" onchange="loadSelectedNews()">
-      <option value="">⚡ 최신 뉴스를 가져오는 중...</option>
+      <option value="">⚡ 뉴스를 가져오는 중...</option>
     </select>
   </div>
 
@@ -45,48 +45,111 @@
   </div>
 
   <script>
-  async function fetchVOANews() {
-  const selectEl = document.getElementById('newsSelect');
-  selectEl.innerHTML = '<option value="">⚡ 최신 뉴스를 가져오는 중...</option>';
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+    }
 
-  // VOA Learning English RSS 주소
-  const rssUrl = 'https://learningenglish.voanews.com/api/z-$m_qvy5-it';
-  
-  // CORS 차단을 우회해주는 공개 프록시 API 사용
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+    let newsArticles = [];
+    const savedWords = new Set();
 
-  try {
-    const response = await fetch(proxyUrl);
-    const result = await response.json();
-    
-    if (result.contents) {
-      // XML 데이터를 파싱
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(result.contents, "text/xml");
-      const items = xmlDoc.querySelectorAll("item");
+    // 네트워크 문제 발생 시 보여줄 기본 샘플 뉴스
+    const fallbackNews = [
+      {
+        title: "[샘플] VOA: Technology Trends in Education",
+        content: "Technology is changing how students learn around the world. Online tools and modern applications make it easier for people to practice languages anytime and anywhere."
+      },
+      {
+        title: "[샘플] VOA: Health and Lifestyle Today",
+        content: "Drinking enough water and getting daily exercise are simple habits that improve focus and energy throughout the day."
+      }
+    ];
 
-      newsArticles = [];
-      selectEl.innerHTML = '<option value="">-- 읽고 싶은 뉴스를 선택하세요 --</option>';
+    async function fetchVOANews() {
+      const selectEl = document.getElementById('newsSelect');
+      selectEl.innerHTML = '<option value="">⚡ 뉴스를 가져오는 중...</option>';
 
-      items.forEach((item, index) => {
-        const title = item.querySelector("title") ? item.querySelector("title").textContent : "제목 없음";
-        const description = item.querySelector("description") ? item.querySelector("description").textContent : "";
+      const rssUrl = 'https://learningenglish.voanews.com/api/z-$m_qvy5-it';
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+
+      // 4초 이상 걸리면 강제로 타임아웃
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      try {
+        const response = await fetch(apiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json();
         
-        newsArticles.push({ title: title, content: description });
+        if (data.status === 'ok' && data.items && data.items.length > 0) {
+          newsArticles = data.items.map(item => ({
+            title: item.title,
+            content: item.content || item.description
+          }));
+        } else {
+          throw new Error("API 응답 오류");
+        }
+      } catch (error) {
+        console.warn("실시간 RSS 로딩 실패, 백업 뉴스로 전환합니다.");
+        newsArticles = fallbackNews;
+      }
 
+      // 선택 목록 렌더링
+      selectEl.innerHTML = '<option value="">-- 읽고 싶은 뉴스를 선택하세요 --</option>';
+      newsArticles.forEach((item, index) => {
         const option = document.createElement('option');
         option.value = index;
-        option.innerText = title;
+        option.innerText = item.title;
         selectEl.appendChild(option);
       });
-    } else {
-      throw new Error("데이터 없음");
     }
-  } catch (error) {
-    console.error(error);
-    selectEl.innerHTML = '<option value="">⚠️ 뉴스를 불러오지 못했습니다. 클릭하여 다시 시도하세요.</option>';
-  }
-}
+
+    function loadSelectedNews() {
+      const index = document.getElementById('newsSelect').value;
+      const container = document.getElementById('transcript');
+
+      if (index === "") {
+        container.innerHTML = '<span style="color: #999;">위 목록에서 뉴스를 선택하면 스크립트가 자동으로 로드됩니다.</span>';
+        return;
+      }
+
+      const selected = newsArticles[index];
+      const cleanText = selected.content.replace(/<[^>]*>?/gm, '').trim();
+      const words = cleanText.split(/\s+/);
+
+      container.innerHTML = words.map(word => {
+        const cleanWord = word.replace(/[^a-zA-Z]/g, "");
+        return `<span class="word-token" data-word="${cleanWord}">${word}</span>`;
+      }).join(' ');
+    }
+
+    document.getElementById('transcript').addEventListener('click', (e) => {
+      if (e.target.classList.contains('word-token')) {
+        const word = e.target.getAttribute('data-word').toLowerCase();
+        if (word && word.length > 1) {
+          savedWords.add(word);
+          renderWordList();
+        }
+      }
+    });
+
+    function renderWordList() {
+      const listContainer = document.getElementById('wordList');
+      if (savedWords.size === 0) {
+        listContainer.innerHTML = "터치한 단어가 여기에 표시됩니다.";
+        return;
+      }
+      listContainer.innerHTML = Array.from(savedWords).map(w => `<span class="word-chip">${w}</span>`).join('');
+    }
+
+    function exportToGoogleDocs() {
+      if (savedWords.size === 0) {
+        alert("선택된 단어가 없습니다!");
+        return;
+      }
+      alert("Google Docs 전송 단어 목록:\n" + Array.from(savedWords).join(', '));
+    }
+
+    window.onload = fetchVOANews;
   </script>
 </body>
 </html>

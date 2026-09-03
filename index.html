@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <title>VOA 미국 영어 학습기</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 15px; background: #f8f9fa; color: #333; }
+    h2 { font-size: 1.2rem; margin-top: 0; color: #003366; }
+    h3 { font-size: 0.95rem; margin-bottom: 8px; color: #555; }
+    
+    /* 입력 및 스크립트 영역 */
+    .input-box { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; }
+    textarea { width: 95%; height: 80px; border: 1px solid #ccc; border-radius: 6px; padding: 8px; font-size: 0.85rem; resize: none; }
+    .btn-apply { width: 100%; padding: 10px; background: #003366; color: #fff; border: none; border-radius: 6px; font-weight: bold; margin-top: 8px; cursor: pointer; }
+    
+    .transcript-box { height: 250px; overflow-y: auto; background: #fff; border: 1px solid #e0e0e0; padding: 15px; line-height: 1.8; border-radius: 8px; font-size: 0.95rem; }
+    .word-token { cursor: pointer; padding: 2px 3px; border-radius: 4px; display: inline; transition: background 0.15s; }
+    .word-token:hover, .word-token:active { background-color: #ffe066; }
+    
+    /* 단어장 영역 */
+    .vocab-section { margin-top: 15px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; }
+    .word-chip { display: inline-block; background: #e9ecef; color: #495057; padding: 5px 10px; margin: 4px; border-radius: 15px; font-size: 0.85rem; font-weight: 500; }
+    .btn-export { width: 100%; padding: 12px; background: #28a745; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 0.95rem; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <h2>🇺🇸 VOA Daily English Learner</h2>
+
+  <!-- 스크립트 입력 상자 -->
+  <div class="input-box">
+    <h3>1. VOA 기사 스크립트 붙여넣기</h3>
+    <textarea id="rawInput" placeholder="VOA Learning English 웹사이트에서 복사한 기사 텍스트를 여기에 붙여넣으세요..."></textarea>
+    <button class="btn-apply" onclick="processScript()">학습 스크립트로 변환하기</button>
+  </div>
+
+  <!-- 변환된 터치 스크립트 화면 -->
+  <h3>2. 스크립트 (단어를 터치하세요)</h3>
+  <div class="transcript-box" id="transcript">
+    <span style="color: #999;">위 상자에 텍스트를 넣고 변환 버튼을 누르면 터치 가능한 스크립트가 생성됩니다.</span>
+  </div>
+
+  <!-- 단어장 영역 -->
+  <div class="vocab-section">
+    <h3>📚 오늘의 단어장</h3>
+    <div id="wordList" style="min-height: 35px; color: #888; font-size: 0.85rem;">터치한 단어가 여기에 표시됩니다.</div>
+    <button class="btn-export" onclick="exportToGoogleDocs()">Google Docs로 내보내기</button>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+    }
+
+    const savedWords = new Set();
+
+    // 텍스트 입력받아 단어별 태그로 변환
+    function processScript() {
+      const text = document.getElementById('rawInput').value.trim();
+      const container = document.getElementById('transcript');
+      
+      if (!text) {
+        alert("스크립트 텍스트를 입력해 주세요!");
+        return;
+      }
+
+      const words = text.split(/\s+/);
+      container.innerHTML = words.map(word => {
+        const cleanWord = word.replace(/[^a-zA-Z]/g, "");
+        return `<span class="word-token" data-word="${cleanWord}">${word}</span>`;
+      }).join(' ');
+    }
+
+    // 단어 클릭 이벤트
+    document.getElementById('transcript').addEventListener('click', (e) => {
+      if (e.target.classList.contains('word-token')) {
+        const word = e.target.getAttribute('data-word').toLowerCase();
+        if (word && word.length > 1) {
+          savedWords.add(word);
+          renderWordList();
+        }
+      }
+    });
+
+    function renderWordList() {
+      const listContainer = document.getElementById('wordList');
+      if (savedWords.size === 0) {
+        listContainer.innerHTML = "터치한 단어가 여기에 표시됩니다.";
+        return;
+      }
+      listContainer.innerHTML = Array.from(savedWords).map(w => `<span class="word-chip">${w}</span>`).join('');
+    }
+
+    function exportToGoogleDocs() {
+      if (savedWords.size === 0) {
+        alert("선택된 단어가 없습니다!");
+        return;
+      }
+      alert("Google Docs 전송 단어 목록:\n" + Array.from(savedWords).join(', '));
+    }
+  </script>
+</body>
+</html>
